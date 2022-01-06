@@ -5,19 +5,23 @@ import cloud.commandframework.arguments.standard.StringArgument
 import cloud.commandframework.execution.AsynchronousCommandExecutionCoordinator
 import cloud.commandframework.jda.JDA4CommandManager
 import cloud.commandframework.jda.JDACommandSender
-import cloud.commandframework.kotlin.extension.argumentDescription
 import cloud.commandframework.kotlin.extension.buildAndRegister
+import cloud.commandframework.meta.CommandMeta
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import fr.xpdustry.dusty.core.MessageListener
-import fr.xpdustry.dusty.util.*
+import fr.xpdustry.dusty.util.Fun
+import fr.xpdustry.dusty.util.Matrix
+import fr.xpdustry.dusty.util.fromJson
+import fr.xpdustry.dusty.util.get
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.entities.Message.MentionType
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
+import net.dv8tion.jda.api.requests.GatewayIntent
 import java.net.URL
 import java.util.concurrent.Executors
 import java.util.function.Function
@@ -31,7 +35,8 @@ class Dusty(token: String) : ListenerAdapter() {
     val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
     override fun onGuildMemberJoin(event: GuildMemberJoinEvent) {
-        event.guild.systemChannel?.sendMessage("""
+        event.guild.systemChannel?.sendMessage(
+            """
             Welcome to Scidustry, ${event.member.asMention}
             
             Scidustry focuses on logic inside of Mindustry. We have developed many gates and other logic things to build any circuit you can imagine.
@@ -44,7 +49,7 @@ class Dusty(token: String) : ListenerAdapter() {
 
             AND FOLLOW THE DAMN RULES!
         """.trimIndent()
-        )?.complete()
+        )?.queue()
     }
 
     fun start() {
@@ -55,7 +60,8 @@ class Dusty(token: String) : ListenerAdapter() {
         try {
             jda = JDABuilder
                 .createDefault(token)
-                .addEventListeners(messages)
+                .enableIntents(GatewayIntent.GUILD_MEMBERS)
+                .addEventListeners(messages, this)
                 .build()
 
             commands = JDA4CommandManager(
@@ -74,7 +80,6 @@ class Dusty(token: String) : ListenerAdapter() {
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) throw IllegalArgumentException("You need to specify the token of Dusty...")
-
     val dusty = Dusty(args[0])
 
     with(dusty.messages) {
@@ -125,23 +130,28 @@ fun main(args: Array<String>) {
     }
 
     with(dusty.commands) {
-        buildAndRegister("ping", argumentDescription("Replies \"Pong!\", nothing else."), arrayOf("p")) {
+        buildAndRegister("ping", aliases = arrayOf("p")) {
+            meta(CommandMeta.DESCRIPTION, "Replies \"Pong!\", nothing else.")
             handler { it.sender.channel.sendMessage("pong").queue() }
         }
 
-        buildAndRegister("flip", argumentDescription("Flips a coin"), arrayOf("f")) {
+        buildAndRegister("flip", aliases = arrayOf("f")) {
+            meta(CommandMeta.DESCRIPTION, "Flips a coin")
             handler { it.sender.channel.sendMessage(arrayOf("Heads!", "Tails!").random()).queue() }
         }
 
-        buildAndRegister("router", argumentDescription("Uses the :router: emoji a bunch of times.")) {
+        buildAndRegister("router") {
+            meta(CommandMeta.DESCRIPTION, "Uses the :router: emoji a bunch of times.")
             handler { it.sender.channel.sendMessage(("<:router:924099269147906058>".repeat(5) + "\n").repeat(5)).queue() }
         }
 
-        buildAndRegister("quote", argumentDescription("AI Inspirational quotes")) {
+        buildAndRegister("quote") {
+            meta(CommandMeta.DESCRIPTION, "AI Inspirational quotes")
             handler { it.sender.channel.sendMessage(URL("https://inspirobot.me/api?generate=true").get()).queue() }
         }
 
-        buildAndRegister("roll", argumentDescription("Rolls a dice, you can also guess numbers"), arrayOf("r")) {
+        buildAndRegister("roll", aliases = arrayOf("r")) {
+            meta(CommandMeta.DESCRIPTION, "Rolls a dice, you can also guess numbers")
             argument(IntegerArgument.newBuilder<JDACommandSender>("guess").withMin(0).withMax(6).asOptional())
             handler {
                 val rand = Random.nextInt(7)
@@ -156,7 +166,8 @@ fun main(args: Array<String>) {
             }
         }
 
-        buildAndRegister("weebify", argumentDescription("Weebifies text"), arrayOf("w")) {
+        buildAndRegister("weebify", aliases = arrayOf("w")) {
+            meta(CommandMeta.DESCRIPTION, "Weebifies text")
             argument(StringArgument.newBuilder<JDACommandSender>("text").greedy())
             handler {
                 if (it.sender.channel.idLong == 652252853838151692L) {
@@ -169,7 +180,8 @@ fun main(args: Array<String>) {
             }
         }
 
-        buildAndRegister("say", argumentDescription("Make me say stuff")) {
+        buildAndRegister("say") {
+            meta(CommandMeta.DESCRIPTION, "Make me say stuff")
             argument(StringArgument.newBuilder<JDACommandSender>("text").greedy())
             handler {
                 val text: String = it["text"]
@@ -181,7 +193,8 @@ fun main(args: Array<String>) {
             }
         }
 
-        buildAndRegister("xkcd", argumentDescription("Sends a random xkcd comic.")) {
+        buildAndRegister("xkcd") {
+            meta(CommandMeta.DESCRIPTION, "Sends a random xkcd comic.")
             handler {
                 val latest = dusty.gson.fromJson<JsonObject>(URL("https://xkcd.com/info.0.json").get())["num"].asInt
                 val random = "https://xkcd.com/" + (0..latest).random()
@@ -195,7 +208,8 @@ fun main(args: Array<String>) {
             }
         }
 
-        buildAndRegister("minesweeper", argumentDescription("Creates a minesweeper grid of spoilers")) {
+        buildAndRegister("minesweeper") {
+            meta(CommandMeta.DESCRIPTION, "Creates a minesweeper grid of spoilers")
             argument(IntegerArgument.newBuilder<JDACommandSender>("x").withMin(4).withMax(8).asOptionalWithDefault(8))
             argument(IntegerArgument.newBuilder<JDACommandSender>("y").withMin(4).withMax(8).asOptionalWithDefault(8))
             argument(IntegerArgument.newBuilder<JDACommandSender>("n").withMin(4).withMax(8 * 8).asOptional())
@@ -222,19 +236,28 @@ fun main(args: Array<String>) {
             }
         }
 
-        buildAndRegister("help", argumentDescription("Display some help."), arrayOf("h")){
+        buildAndRegister("help", aliases = arrayOf("h")) {
+            meta(CommandMeta.DESCRIPTION, "Display some help.")
+            handler { ctx ->
+                ctx.sender.channel.sendMessageEmbeds(EmbedBuilder().apply {
+                    setTitle("Dusty, the Scidustry Discord Bot")
+                    ctx.sender.event.ifPresent { e -> setColor(e.guild.selfMember.color) }
+                    setThumbnail(jda.selfUser.avatarUrl ?: jda.selfUser.defaultAvatarUrl)
+                    commandHelpHandler.allCommands.forEach { addField(it.syntaxString, it.description, false) }
+                }.build()).queue()
+            }
+        }
+
+        buildAndRegister("info") {
+            meta(CommandMeta.DESCRIPTION, "Some info about the bot...")
             handler {
                 it.sender.channel.sendMessageEmbeds(EmbedBuilder().apply {
-                    setTitle("Dusty, the Scidustry Discord Bot")
-                    setThumbnail(jda.selfUser.avatarUrl ?: jda.selfUser.defaultAvatarUrl)
-                    it.sender.event.ifPresent {e -> setColor(e.guild.selfMember.color) }
-                    for (command in commands) {
-                        addField(
-                            commandSyntaxFormatter.apply(command.arguments, null),
-                            command.components[0].argumentDescription.description,
-                            false
-                        )
-                    }
+                    setTitle("Behold, here comes Dusty!")
+                    setDescription("A discord bot for Scidustry.")
+                    addField("Creator", "<@490965960858271745>", false)
+                    addField("Maintainer", "<@330298929331699713>", false)
+                    addField("Version", "v1.2", false)
+                    it.sender.event.ifPresent { e -> setColor(e.guild.selfMember.color) }
                 }.build()).queue()
             }
         }
